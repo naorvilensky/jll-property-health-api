@@ -110,11 +110,54 @@ def compute_final_health_score(current, trend, quality):
     )
     return max(0.0, min(100.0, score))
 
+def compute_historic_comparison(
+    property_data: Dict[str, Any],
+    performance_history: list[Dict[str, Any]],
+    metric_pairs: list[tuple[str, str]]
+):
+    history_results = []
+
+    for prop_key, market_key in metric_pairs:
+        prop_val = property_data.get(prop_key)
+        if prop_val is None:
+            continue
+
+        metric_history = []
+
+        for month in performance_history:
+            market_val = month.get(market_key)
+            if market_val is None:
+                continue
+
+            # direction-aware normalization
+            if scoring.INVERTED_KPIS.get(prop_key, False):
+                relative = (market_val - prop_val) / market_val
+            else:
+                relative = (prop_val - market_val) / market_val
+
+            score = score_band(relative)
+
+            metric_history.append({
+                "date": month["date"],
+                "property_value": prop_val,
+                "market_value": market_val,
+                "relative_difference": round(relative, 2),
+                "score": score
+            })
+
+        history_results.append({
+            "metric": prop_key,
+            "history": metric_history
+        })
+
+    return history_results
+
 
 def compare_property_to_market(
         property_data: Dict[str, Any],
         market_data: Dict[str, Any],
-        filtered_metrics: Optional[list[str]] = None
+        filtered_metrics: Optional[list[str]] = None,
+        include_history: bool = False
 ):
     latest_market = market_data["performance"][-1]
     comparison_date = latest_market["date"]
@@ -131,6 +174,14 @@ def compare_property_to_market(
     if filtered_metrics:
         metrics_list = [m for m in metrics_list if m["name"] in filtered_metrics]
 
+    historic_comparison = None
+    if include_history:
+        historic_comparison = compute_historic_comparison(
+            property_data,
+            market_data["performance"],
+            scoring.METRIC_PAIRS
+        )
+
     return {
         "property_id": property_data["id"],
         "property_name": property_data["name"],
@@ -143,11 +194,12 @@ def compare_property_to_market(
             "current_performance": round(current_performance, 2),
             "trend": round(trend_score, 2),
             "data_quality": round(data_quality_component, 2),
-        }
+        },
+        "historic_comparison": historic_comparison,
     }
 
 
-def get_property_market_performance(property_id: int, filtered_metrics: Optional[list[str]] = None):
+def get_property_market_performance(property_id: int, filtered_metrics: Optional[list[str]] = None, include_history: bool = False):
     property_data = find_property(property_id)
     if not property_data:
         raise ValueError(f"Property {property_id} not found")
@@ -159,11 +211,11 @@ def get_property_market_performance(property_id: int, filtered_metrics: Optional
     if filtered_metrics is None:
         return _cached_full_performance(property_id)
 
-    return compare_property_to_market(property_data, market_data, filtered_metrics)
+    return compare_property_to_market(property_data, market_data, filtered_metrics, include_history)
 
 
 @lru_cache(maxsize=10)
-def _cached_full_performance(property_id: int):
+def _cached_full_performance(property_id: int, include_history: bool = False):
     prop = find_property(property_id)
     market = find_market(prop["market_id"])
-    return compare_property_to_market(prop, market)
+    return compare_property_to_market(prop, market, filtered_metrics=None, include_history=include_history)
