@@ -162,12 +162,10 @@ def compare_property_to_market(
     latest_market = market_data["performance"][-1]
     comparison_date = latest_market["date"]
 
-    metric_pairs = scoring.METRIC_PAIRS
-
-    metrics_list, kpi_scores = score_all_kpis(property_data, latest_market, metric_pairs)
+    metrics_list, kpi_scores = score_all_kpis(property_data, latest_market, scoring.METRIC_PAIRS)
     category_scores = compute_category_scores(kpi_scores)
     current_performance = compute_current_performance(category_scores)
-    trend_score = compute_trend_score(market_data["performance"], metric_pairs)
+    trend_score = compute_trend_score(market_data["performance"], scoring.METRIC_PAIRS)
     data_quality_component = compute_data_quality(market_data)
     health_score = compute_final_health_score(current_performance, trend_score, data_quality_component)
 
