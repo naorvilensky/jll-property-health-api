@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from db.market_db import find_market
 from db.property_db import find_property
 import consts.scoring as scoring
@@ -111,18 +111,25 @@ def compute_final_health_score(current, trend, quality):
     return max(0.0, min(100.0, score))
 
 
-def compare_property_to_market(property_data, market_data):
+def compare_property_to_market(
+        property_data: Dict[str, Any],
+        market_data: Dict[str, Any],
+        filtered_metrics: Optional[list[str]] = None
+):
     latest_market = market_data["performance"][-1]
     comparison_date = latest_market["date"]
 
+    metric_pairs = scoring.METRIC_PAIRS
 
-
-    metrics, kpi_scores = score_all_kpis(property_data, latest_market, scoring.METRIC_PAIRS)
+    metrics_list, kpi_scores = score_all_kpis(property_data, latest_market, metric_pairs)
     category_scores = compute_category_scores(kpi_scores)
     current_performance = compute_current_performance(category_scores)
-    trend_score = compute_trend_score(market_data["performance"], scoring.METRIC_PAIRS)
+    trend_score = compute_trend_score(market_data["performance"], metric_pairs)
     data_quality_component = compute_data_quality(market_data)
     health_score = compute_final_health_score(current_performance, trend_score, data_quality_component)
+
+    if filtered_metrics:
+        metrics_list = [m for m in metrics_list if m["name"] in filtered_metrics]
 
     return {
         "property_id": property_data["id"],
@@ -130,7 +137,7 @@ def compare_property_to_market(property_data, market_data):
         "market_id": market_data["market_id"],
         "market_name": market_data["market_name"],
         "comparison_date": comparison_date,
-        "metrics": metrics,
+        "metrics": metrics_list,
         "health_score": round(health_score, 2),
         "health_components": {
             "current_performance": round(current_performance, 2),
@@ -140,8 +147,7 @@ def compare_property_to_market(property_data, market_data):
     }
 
 
-@lru_cache(maxsize=10)
-def get_property_market_performance(property_id: int):
+def get_property_market_performance(property_id: int, filtered_metrics: Optional[list[str]] = None):
     property_data = find_property(property_id)
     if not property_data:
         raise ValueError(f"Property {property_id} not found")
@@ -150,4 +156,14 @@ def get_property_market_performance(property_id: int):
     if not market_data:
         raise ValueError(f"Market {property_data['market_id']} not found")
 
-    return compare_property_to_market(property_data, market_data)
+    if filtered_metrics is None:
+        return _cached_full_performance(property_id)
+
+    return compare_property_to_market(property_data, market_data, filtered_metrics)
+
+
+@lru_cache(maxsize=10)
+def _cached_full_performance(property_id: int):
+    prop = find_property(property_id)
+    market = find_market(prop["market_id"])
+    return compare_property_to_market(prop, market)

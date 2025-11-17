@@ -16,9 +16,6 @@ def property_market_performance(
         metrics: Optional[List[str]] = Query(None),
         include_history: Optional[bool] = Query(False),
 ):
-    result = get_property_market_performance(property_id)
-
-    if metrics:
-        result["metrics"] = [m for m in result["metrics"] if m["name"] in metrics]
+    result = get_property_market_performance(property_id, metrics)
 
     return result
