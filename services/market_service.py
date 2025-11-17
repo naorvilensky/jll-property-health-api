@@ -206,14 +206,14 @@ def get_property_market_performance(property_id: int, filtered_metrics: Optional
     if not market_data:
         raise ValueError(f"Market {property_data['market_id']} not found")
 
-    if filtered_metrics is None:
-        return _cached_full_performance(property_id)
+    if filtered_metrics is not None or include_history is True:
+        return compare_property_to_market(property_data, market_data, filtered_metrics, include_history)
 
-    return compare_property_to_market(property_data, market_data, filtered_metrics, include_history)
+    return _cached_full_performance(property_id)
 
 
 @lru_cache(maxsize=10)
-def _cached_full_performance(property_id: int, include_history: bool = False):
+def _cached_full_performance(property_id: int):
     prop = find_property(property_id)
     market = find_market(prop["market_id"])
-    return compare_property_to_market(prop, market, filtered_metrics=None, include_history=include_history)
+    return compare_property_to_market(prop, market)
