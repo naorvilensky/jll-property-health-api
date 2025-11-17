@@ -1,12 +1,20 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
+
 class MetricComparison(BaseModel):
     name: str
     property_value: Optional[float]
     market_value: Optional[float]
     difference: Optional[float]
     percent_difference: Optional[float]
+
+
+class HealthComponents(BaseModel):
+    current_performance: float
+    trend: float
+    data_quality: float
+
 
 class MarketPerformanceResponse(BaseModel):
     property_id: int
@@ -15,3 +23,5 @@ class MarketPerformanceResponse(BaseModel):
     market_name: str
     comparison_date: Optional[str]
     metrics: List[MetricComparison]
+    health_score: float
+    health_components: HealthComponents
