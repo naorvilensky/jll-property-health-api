@@ -1,5 +1,0 @@
-# System Design
-
-## Flow Explanation
-
-### 
